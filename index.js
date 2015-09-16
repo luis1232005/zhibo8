@@ -1,24 +1,31 @@
 var fetchUrl  = require('fetch').fetchUrl;
 var cheerio = require('cheerio');
+var fs = require('fs-extra');
+var path = require('path');
 
 console.log("-");
 fetchUrl('http://www.zhibo8.cc/',{},function(err,meta,body){
     if(err){
-        //todo д����־
+        //todo 写入日志
         return ;
     }
 
+    //console.log(body);
+
     var html = body.toString('utf-8');
+
+    //console.log(html);
 
     $ = cheerio.load(html);
 
     function formatData(item){
-        var date = $(".titlebar h2",item).attr('title')
 
         var items = [];
         $(".content li",item).each(function(){
             var cls = $(this).attr('label') || '';
-            if(cls.indexOf('����') || cls.indexOf('����')){
+
+            if(/.*(英超|NBA|欧冠|世界杯|美洲杯|亚冠|亚洲杯|西甲|德甲|意甲|欧联).*/gi.test(cls)){
+
                 var linkEls = $("a",$(this)),
                     links = [];
 
@@ -29,23 +36,45 @@ fetchUrl('http://www.zhibo8.cc/',{},function(err,meta,body){
                     })
                 });
 
-                //����������ı�
+                //console.log(links);
+
+                //清空连接中文本
                 linkEls.html('');
 
-                //�ж�
-                items.push({
-                    title: $(this).text(),
-                    links: links
-                })
+                //判断
+                var title = $(this).text().replace(/^\s+|\s+$|\\n+/gi,'');
+                //console.log(title);
+                if(!!title && /.*(英超|NBA|欧冠|世界杯|美洲杯|亚冠|亚洲杯|西甲|德甲|意甲|欧联).*/gi.test(title)){
+                    items.push({
+                        title: title,
+                        keywords : cls,
+                        links: links
+                    })
+                }
             }
         });
 
-        console.log(items);
+        return items;
     }
 
+    //执行
+    var dayitems = [];
     $(".box").each(function(){
-        var day = $(".titlebar h2",$(this)).attr('title');
+        var date = $(".titlebar h2",$(this)).attr('title');
+        var items;
+        if(!!date){
+            items = formatData($(this))||[];
 
-        formatData($(this));
+            dayitems.push({
+                date: date,
+                items: items
+            });
+        }
     });
+
+    var zbyPath = path.join(__dirname,"/db/zby.json");
+
+    console.log(zbyPath);
+    fs.writeJSONSync(zbyPath,dayitems);
+    console.log('抓取成功！');
 });
